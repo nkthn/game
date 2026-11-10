@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pizza Topping Auction</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=DM+Mono:wght@500&family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&display=swap">
+<style>
+/* Layout: one column "auction floor" — lot card on top, bidder paddles below, controls pinned in reach of the thumb. Single committed look: basil-green felt table. */
+:root {
+  --felt: #15301f;
+  --felt-2: #1c3d29;
+  --felt-3: #25503a;
+  --dough: #f6ecd6;
+  --dough-dim: #c9c1aa;
+  --tomato: #e2412b;
+  --tomato-ink: #b8301d;
+  --cheese: #f5b83d;
+  --ink: #2a1d14;
+  --line: rgba(246, 236, 214, 0.16);
+  --font-display: "Bagel Fat One", "Arial Black", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--felt);
+  color: var(--dough);
+  font: 16px/1.5 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+  min-height: 100%;
+}
+[hidden] { display: none !important; }
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 20px; }
+h1, h2, .display { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.01em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.2rem, 7vw, 3.6rem); line-height: 1; color: var(--cheese); }
+h2 { font-size: 1.35rem; line-height: 1.1; }
+p { margin: 0; }
+.muted { color: var(--dough-dim); }
+.label { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dough-dim); font-weight: 700; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--cheese); outline-offset: 2px; }
+.btn {
+  border: 0; border-radius: 999px; padding: 12px 20px; font-weight: 700;
+  background: var(--felt-3); color: var(--dough);
+  transition: transform .08s ease, background .15s ease;
+}
+.btn:hover:not(:disabled) { background: #2d5e44; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--tomato); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--tomato-ink); }
+.btn.cheese { background: var(--cheese); color: var(--ink); }
+.btn.cheese:hover:not(:disabled) { background: #e7a826; }
+.btn.ghost { background: transparent; box-shadow: inset 0 0 0 2px var(--line); }
+.btn.big { padding: 16px 28px; font-size: 1.1rem; }
+
+/* ---------- setup ---------- */
+.intro { display: grid; gap: 12px; }
+.intro p { max-width: 60ch; font-size: 1.05rem; }
+.panel { background: var(--felt-2); border-radius: 18px; padding: 20px; display: grid; gap: 16px; }
+.players { display: grid; gap: 10px; }
+.player-row { display: flex; gap: 10px; align-items: center; }
+.paddle-chip {
+  flex: none; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--dough); color: var(--ink);
+  font-family: var(--font-num); font-weight: 500;
+}
+.player-row input {
+  flex: 1; min-width: 0; padding: 10px 14px; border-radius: 12px;
+  border: 2px solid var(--line); background: var(--felt);
+}
+.icon-btn { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; background: transparent; color: var(--dough-dim); font-size: 1.3rem; }
+.icon-btn:hover { background: var(--felt-3); color: var(--dough); }
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.field { display: grid; gap: 6px; }
+.field input[type=number], .field select {
+  padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--felt); width: 100%;
+}
+.toggle { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: var(--felt); cursor: pointer; }
+.toggle input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--tomato); flex: none; }
+.toggle small { display: block; color: var(--dough-dim); }
+.err { color: #ff9d8a; font-weight: 600; }
+
+/* ---------- auction ---------- */
+.topbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.topbar .grow { flex: 1; min-width: 140px; }
+.progress { height: 8px; border-radius: 99px; background: var(--felt-2); overflow: hidden; margin-top: 6px; }
+.progress > i { display: block; height: 100%; background: var(--cheese); transition: width .3s ease; }
+
+.lot {
+  position: relative; background: var(--dough); color: var(--ink); border-radius: 22px;
+  padding: 22px; display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center;
+  overflow: hidden;
+}
+.lot .tag { position: absolute; top: 14px; left: 22px; font-size: .72rem; letter-spacing: .14em; font-weight: 700; color: #8a7a5e; text-transform: uppercase; }
+.lot .emoji { font-size: clamp(3.4rem, 12vw, 5.5rem); line-height: 1; margin-top: 14px; }
+.lot .name { font-family: var(--font-display); font-size: clamp(1.6rem, 5.5vw, 2.5rem); line-height: 1.05; margin-top: 14px; text-wrap: balance; min-width: 0; }
+.lot .sub { font-size: .95rem; color: #6b5b44; margin-top: 4px; }
+.wild-pill { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 99px; background: var(--cheese); color: var(--ink); font: 700 .7rem/1.6 var(--font-body); letter-spacing: .1em; text-transform: uppercase; vertical-align: middle; }
+.price { text-align: right; }
+.price .amt { font-family: var(--font-display); font-size: clamp(3rem, 12vw, 5rem); line-height: 1; color: var(--tomato); }
+.price .who { font-weight: 700; }
+.timer { font-weight: 700; color: var(--tomato-ink); min-height: 1.5em; }
+.lot.flash { animation: flash .35s ease; }
+@keyframes flash { 0% { transform: scale(1); } 40% { transform: scale(1.015); } 100% { transform: scale(1); } }
+
+.stamp {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  background: rgba(246, 236, 214, .94); padding: 16px;
+}
+.stamp .inner { transform: rotate(-6deg); border: 5px solid var(--tomato); color: var(--tomato); border-radius: 14px; padding: 10px 22px; animation: stamp .35s cubic-bezier(.2,1.6,.4,1); }
+.stamp .inner b { display: block; font-family: var(--font-display); font-weight: 400; font-size: clamp(2rem, 9vw, 3.4rem); line-height: 1; }
+.stamp .inner span { font-weight: 700; color: var(--ink); }
+.stamp.nosale .inner { border-color: #8a7a5e; color: #8a7a5e; }
+@keyframes stamp { from { transform: rotate(-6deg) scale(1.8); opacity: 0; } to { transform: rotate(-6deg) scale(1); opacity: 1; } }
+
+.paddles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.paddle {
+  border: 0; text-align: left; border-radius: 18px; padding: 14px; background: var(--felt-2);
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center;
+  box-shadow: inset 0 0 0 2px transparent; transition: background .15s, box-shadow .15s, transform .08s;
+}
+.paddle .disc { grid-row: span 2; width: 48px; height: 48px; border-radius: 50%; background: var(--dough); color: var(--ink); display: grid; place-items: center; font-family: var(--font-num); font-size: 1.2rem; }
+.paddle .pname { font-weight: 700; font-size: 1.05rem; overflow-wrap: anywhere; min-width: 0; }
+.paddle .pmeta { font-size: .85rem; color: var(--dough-dim); }
+.paddle .act { grid-column: 1 / -1; margin-top: 8px; padding: 8px 12px; border-radius: 99px; text-align: center; font-weight: 700; background: var(--tomato); color: #fff; }
+.paddle:hover:not(:disabled) { background: var(--felt-3); }
+.paddle:active:not(:disabled) { transform: translateY(1px); }
+.paddle:disabled { cursor: default; }
+.paddle:disabled .act { background: transparent; color: var(--dough-dim); box-shadow: inset 0 0 0 2px var(--line); }
+.paddle.leading { box-shadow: inset 0 0 0 3px var(--cheese); }
+.paddle.leading .disc { background: var(--cheese); }
+.paddle.leading .act { color: var(--cheese); box-shadow: inset 0 0 0 2px var(--cheese); }
+
+.controls { display: flex; gap: 10px; flex-wrap: wrap; }
+.controls .grow { flex: 1 1 220px; }
+.hint { font-size: .85rem; color: var(--dough-dim); }
+kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-radius: 6px; background: var(--felt-2); }
+
+.log { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.log li { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 10px; background: var(--felt-2); font-size: .95rem; }
+.log li .grow { flex: 1; min-width: 0; }
+
+/* ---------- results ---------- */
+.awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.award { background: var(--felt-2); border-radius: 16px; padding: 14px 16px; display: grid; gap: 2px; }
+.award b { font-size: 1.05rem; }
+.pizzas { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.pizza-card { background: var(--felt-2); border-radius: 20px; padding: 18px; display: grid; gap: 12px; align-content: start; }
+.pizza-card canvas { width: 100%; max-width: 240px; aspect-ratio: 1; justify-self: center; }
+.pizza-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pizza-card li { display: flex; justify-content: space-between; gap: 10px; font-size: .95rem; }
+.pizza-card .totals { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 10px; font-size: .9rem; color: var(--dough-dim); }
+
+@media (max-width: 560px) {
+  .lot { grid-template-columns: auto 1fr; }
+  .price { grid-column: 1 / -1; text-align: left; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .paddles { grid-template-columns: 1fr 1fr; }
+  .paddle { grid-template-columns: 1fr; padding: 12px; }
+  .paddle .disc { grid-row: auto; width: 38px; height: 38px; font-size: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+(function () {
+  const TOPPINGS = [
+    ["Pepperoni", "🍕"], ["Italian sausage", "🌭"], ["Bacon", "🥓"], ["Ham", "🍖"],
+    ["Prosciutto", "🥩"], ["Meatballs", "🧆"], ["Grilled chicken", "🍗"], ["Anchovies", "🐟"],
+    ["Shrimp", "🦐"], ["Mushrooms", "🍄"], ["Green bell peppers", "🫑"], ["Red onion", "🧅"],
+    ["Caramelized onions", "🧅"], ["Black olives", "🫒"], ["Kalamata olives", "🫒"], ["Jalapeños", "🌶️"],
+    ["Calabrian chilies", "🌶️"], ["Banana peppers", "🌶️"], ["Pineapple", "🍍"], ["Spinach", "🥬"],
+    ["Arugula", "🌿"], ["Fresh basil", "🌿"], ["Roasted garlic", "🧄"], ["Sun-dried tomatoes", "🍅"],
+    ["Cherry tomatoes", "🍅"], ["Artichoke hearts", "🌱"], ["Fresh mozzarella", "🧀"], ["Ricotta", "🧀"],
+    ["Goat cheese", "🐐"], ["Gorgonzola", "🧀"], ["Extra parmesan", "🧀"], ["Sweet corn", "🌽"],
+    ["Broccoli", "🥦"], ["Fried egg", "🍳"], ["Hot honey", "🍯"], ["Truffle oil", "🫗"], ["Pesto drizzle", "🌿"]
+  ].map(([name, emoji]) => ({ name, emoji, wild: false }));
+
+  const WILDCARDS = [
+    ["Gummy bears", "🧸"], ["Pickles", "🥒"], ["Flamin' Hot Cheetos", "🔥"], ["Marshmallows", "☁️"],
+    ["Peanut butter", "🥜"], ["French fries", "🍟"], ["Chocolate chips", "🍫"], ["Sushi", "🍣"],
+    ["Cereal", "🥣"], ["Sprinkles", "🍬"]
+  ].map(([name, emoji]) => ({ name, emoji, wild: true }));
+
+  const SOLD_PAUSE_MS = 1600;
+  const app = document.getElementById("app");
+  let S;
+  let tick = null;
+  let pauseTimer = null;
+  let endArmed = false;
+
+  function freshState() {
+    return {
+      phase: "setup",
+      names: ["Player 1", "Player 2", "Player 3", "Player 4"],
+      settings: { budget: 30, lots: 15, cap: 0, timer: 0, wild: true, mystery: false },
+      players: [], lots: [], lotIndex: 0, bids: [], deadline: 0, log: [], showing: null, error: ""
+    };
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad2 = (n) => String(n).padStart(2, "0");
+  function shuffle(a) {
+    a = a.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  // ---------- rules ----------
+  const price = () => S.bids.length;                 // opening bid is $1, every bid adds $1
+  const leader = () => (S.bids.length ? S.bids[S.bids.length - 1] : -1);
+  const lot = () => S.lots[S.lotIndex];
+  const capped = (p) => S.settings.cap > 0 && p.items.length >= S.settings.cap;
+  function bidState(i) {
+    const p = S.players[i];
+    if (i === leader()) return { ok: false, why: "High bidder" };
+    if (capped(p)) return { ok: false, why: "Pizza full" };
+    if (p.money < price() + 1) return { ok: false, why: p.money === 0 ? "Out of money" : "Can't afford" };
+    return { ok: true, why: "Bid $" + (price() + 1) };
+  }
+  const anyoneCanOpen = () => S.players.some((p) => !capped(p) && p.money >= 1);
+
+  // ---------- actions ----------
+  function startGame() {
+    const names = S.names.map((n) => n.trim()).filter(Boolean);
+    const st = S.settings;
+    st.budget = Math.max(1, Math.min(999, Math.round(+st.budget) || 30));
+    const poolSize = TOPPINGS.length + (st.wild ? WILDCARDS.length : 0);
+    st.lots = Math.max(1, Math.min(poolSize, Math.round(+st.lots) || 15));
+    if (names.length < 2) { S.error = "Add at least two players to start."; return render(); }
+    S.error = "";
+    S.players = names.map((name) => ({ name, money: st.budget, items: [] }));
+    const pool = shuffle(TOPPINGS.concat(st.wild ? WILDCARDS : []));
+    S.lots = pool.slice(0, st.lots);
+    S.lotIndex = 0; S.bids = []; S.log = []; S.deadline = 0; S.showing = null;
+    S.phase = "auction";
+    render();
+  }
+
+  function bid(i) {
+    if (S.phase !== "auction" || S.showing || !bidState(i).ok) return;
+    S.bids.push(i);
+    if (S.settings.timer) S.deadline = Date.now() + S.settings.timer * 1000;
+    render(true);
+  }
+
+  function undo() {
+    if (S.showing || !S.bids.length) return;
+    S.bids.pop();
+    S.deadline = S.bids.length && S.settings.timer ? Date.now() + S.settings.timer * 1000 : 0;
+    render();
+  }
+
+  function sell() {
+    if (S.showing || !S.bids.length) return;
+    const who = leader(), amt = price(), item = lot();
+    const p = S.players[who];
+    p.money -= amt;
+    p.items.push({ name: item.name, emoji: item.emoji, wild: item.wild, price: amt });
+    S.log.unshift({ lot: S.lotIndex + 1, item: item.name, emoji: item.emoji, who: p.name, price: amt });
+    S.deadline = 0;
+    S.showing = { kind: "sold", who: p.name, price: amt };
+    render();
+    pauseTimer = setTimeout(nextLot, SOLD_PAUSE_MS);
+  }
+
+  function noSale() {
+    if (S.showing || S.bids.length) return;
+    const item = lot();
+    S.log.unshift({ lot: S.lotIndex + 1, item: item.name, emoji: item.emoji, who: null, price: 0 });
+    S.showing = { kind: "nosale" };
+    render();
+    pauseTimer = setTimeout(nextLot, SOLD_PAUSE_MS);
+  }
+
+  function nextLot() {
+    pauseTimer = null;
+    S.showing = null; S.bids = []; S.deadline = 0;
+    S.lotIndex++;
+    if (S.lotIndex >= S.lots.length || !anyoneCanOpen()) S.phase = "end";
+    render();
+  }
+
+  function endEarly() {
+    if (!endArmed) { endArmed = true; render(); setTimeout(() => { endArmed = false; if (S.phase === "auction") render(); }, 3000); return; }
+    endArmed = false;
+    if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+    S.showing = null; S.deadline = 0; S.phase = "end";
+    render();
+  }
+
+  function rematch() {
+    const keep = { names: S.players.map((p) => p.name), settings: S.settings };
+    S = freshState(); S.names = keep.names; S.settings = keep.settings;
+    startGame();
+  }
+
+  // ---------- timer ----------
+  function timerText() {
+    if (!S.settings.timer) return S.bids.length ? "Call it with Sold when the bidding stops." : "";
+    if (!S.bids.length) return "Clock starts on the first bid.";
+    const left = Math.max(0, S.deadline - Date.now()) / 1000;
+    const t = S.settings.timer;
+    if (left > (2 * t) / 3) return Math.ceil(left) + "s on the clock";
+    if (left > t / 3) return "Going once… " + Math.ceil(left) + "s";
+    return "Going twice… " + Math.ceil(left) + "s";
+  }
+  function startTick() {
+    if (tick) return;
+    tick = setInterval(() => {
+      if (S.phase !== "auction" || S.showing || !S.deadline) return;
+      if (Date.now() >= S.deadline) { sell(); return; }
+      const el = document.getElementById("timer");
+      if (el) el.textContent = timerText();
+    }, 150);
+  }
+
+  // ---------- views ----------
+  function render(flash) {
+    if (S.phase === "setup") app.innerHTML = setupView();
+    else if (S.phase === "auction") app.innerHTML = auctionView(flash);
+    else { app.innerHTML = endView(); drawPizzas(); }
+  }
+
+  function setupView() {
+    const st = S.settings;
+    const rows = S.names.map((n, i) => `
+      <div class="player-row">
+        <span class="paddle-chip" aria-hidden="true">${i + 1}</span>
+        <input id="pname-${i}" data-name="${i}" value="${esc(n)}" maxlength="20" aria-label="Player ${i + 1} name" placeholder="Name">
+        <button class="icon-btn" data-remove="${i}" aria-label="Remove player ${i + 1}" ${S.names.length <= 2 ? "disabled" : ""}>×</button>
+      </div>`).join("");
+    return `
+      <section class="intro">
+        <p class="label">Pass-and-play · 2 to 8 players</p>
+        <h1>Pizza Topping Auction</h1>
+        <p>Everyone starts with <b>$${esc(st.budget)}</b>. Toppings come up one at a time in random order. Tap your paddle to raise the price by $1. The highest bidder wins the topping and pays for it. When the lots run out, compare pizzas.</p>
+      </section>
+      <section class="panel">
+        <h2>Bidders</h2>
+        <div class="players">${rows}</div>
+        <div><button class="btn ghost" data-act="add" ${S.names.length >= 8 ? "disabled" : ""}>+ Add player</button></div>
+      </section>
+      <section class="panel">
+        <h2>House rules</h2>
+        <div class="settings">
+          <label class="field"><span class="label">Starting money ($)</span>
+            <input id="s-budget" type="number" min="1" max="999" data-set="budget" value="${esc(st.budget)}"></label>
+          <label class="field"><span class="label">Toppings up for auction</span>
+            <input id="s-lots" type="number" min="1" max="47" data-set="lots" value="${esc(st.lots)}"></label>
+          <label class="field"><span class="label">Max toppings per pizza</span>
+            <select id="s-cap" data-set="cap">
+              ${[0, 3, 4, 5, 6, 8].map((v) => `<option value="${v}" ${+st.cap === v ? "selected" : ""}>${v ? v : "No limit"}</option>`).join("")}
+            </select></label>
+          <label class="field"><span class="label">Auto-sell clock</span>
+            <select id="s-timer" data-set="timer">
+              ${[0, 5, 8, 10, 15].map((v) => `<option value="${v}" ${+st.timer === v ? "selected" : ""}>${v ? v + " seconds after last bid" : "Off: tap Sold yourself"}</option>`).join("")}
+            </select></label>
+        </div>
+        <div class="settings">
+          <label class="toggle"><input id="s-wild" type="checkbox" data-set="wild" ${st.wild ? "checked" : ""}>
+            <span><b>Wildcard toppings</b><small>Gummy bears, pickles, sushi and other things that don't belong on a pizza.</small></span></label>
+          <label class="toggle"><input id="s-mystery" type="checkbox" data-set="mystery" ${st.mystery ? "checked" : ""}>
+            <span><b>Mystery lots</b><small>The topping stays hidden until it sells.</small></span></label>
+        </div>
+      </section>
+      ${S.error ? `<p class="err" role="alert">${esc(S.error)}</p>` : ""}
+      <div><button class="btn primary big" data-act="start">Open the auction</button></div>`;
+  }
+
+  function auctionView(flash) {
+    const item = lot();
+    const hidden = S.settings.mystery && !(S.showing && S.showing.kind === "sold");
+    const lead = leader();
+    const done = S.lotIndex;
+    const total = S.lots.length;
+
+    let stamp = "";
+    if (S.showing && S.showing.kind === "sold") {
+      stamp = `<div class="stamp"><div class="inner"><b>Sold!</b><span>${esc(S.showing.who)} · $${S.showing.price}</span></div></div>`;
+    } else if (S.showing) {
+      stamp = `<div class="stamp nosale"><div class="inner"><b>No sale</b><span>Nobody wanted it</span></div></div>`;
+    }
+
+    const paddles = S.players.map((p, i) => {
+      const b = bidState(i);
+      const key = i < 9 ? `<kbd>${i + 1}</kbd>` : "";
+      return `
+        <button class="paddle ${i === lead ? "leading" : ""}" data-bid="${i}" ${b.ok && !S.showing ? "" : "disabled"} aria-label="${esc(p.name)}: ${esc(b.why)}">
+          <span class="disc">${i + 1}</span>
+          <span class="pname">${esc(p.name)}</span>
+          <span class="pmeta"><span class="num">$${p.money}</span> left · ${p.items.length} topping${p.items.length === 1 ? "" : "s"}${S.settings.cap ? "/" + S.settings.cap : ""}</span>
+          <span class="act">${esc(b.why)}</span>
+        </button>`;
+    }).join("");
+
+    const log = S.log.slice(0, 6).map((l) => `
+      <li><span class="num muted">${pad2(l.lot)}</span><span class="grow">${l.emoji} ${esc(l.item)}</span>
+      <span>${l.who ? esc(l.who) + ' · <span class="num">$' + l.price + "</span>" : '<span class="muted">No sale</span>'}</span></li>`).join("");
+
+    return `
+      <div class="topbar">
+        <div class="grow">
+          <div class="label">Lot ${done + 1} of ${total}</div>
+          <div class="progress"><i style="width:${(done / total) * 100}%"></i></div>
+        </div>
+        <button class="btn ghost" data-act="end">${endArmed ? "Tap again to end" : "End auction"}</button>
+      </div>
+
+      <section class="lot ${flash ? "flash" : ""}" aria-live="polite">
+        <span class="tag">Lot ${pad2(done + 1)}</span>
+        <div class="emoji" aria-hidden="true">${hidden ? "❓" : item.emoji}</div>
+        <div style="min-width:0">
+          <div class="name">${hidden ? "Mystery topping" : esc(item.name)}${!hidden && item.wild ? '<span class="wild-pill">Wildcard</span>' : ""}</div>
+          <div class="sub">${hidden ? "Revealed when the hammer falls." : item.wild ? "Win it and it goes on your pizza. No take-backs." : "Fresh from the walk-in."}</div>
+        </div>
+        <div class="price">
+          <div class="amt num" style="font-family:var(--font-display)">$${price()}</div>
+          <div>
+            <div class="who">${lead >= 0 ? esc(S.players[lead].name) + " leads" : "No bids yet"}</div>
+            <div class="timer" id="timer">${lead >= 0 ? esc(timerText()) : "Opening bid is $1"}</div>
+          </div>
+        </div>
+        ${stamp}
+      </section>
+
+      <section class="paddles" aria-label="Bidders">${paddles}</section>
+
+      <div class="controls">
+        <button class="btn primary big grow" data-act="sell" ${S.bids.length && !S.showing ? "" : "disabled"}>
+          ${lead >= 0 ? "Sold to " + esc(S.players[lead].name) + " for $" + price() : "Sold"}
+        </button>
+        <button class="btn big" data-act="undo" ${S.bids.length && !S.showing ? "" : "disabled"}>Undo bid</button>
+        <button class="btn ghost big" data-act="nosale" ${!S.bids.length && !S.showing ? "" : "disabled"}>No sale</button>
+      </div>
+      <p class="hint">Keyboard: <kbd>1</kbd>–<kbd>${Math.min(9, S.players.length)}</kbd> bid · <kbd>Enter</kbd> sold · <kbd>Z</kbd> undo · <kbd>N</kbd> no sale</p>
+
+      ${log ? `<section style="display:grid;gap:10px"><div class="label">Recent sales</div><ul class="log">${log}</ul></section>` : ""}`;
+  }
+
+  function endView() {
+    const ps = S.players;
+    const awards = [];
+    const all = ps.flatMap((p) => p.items.map((it) => ({ ...it, who: p.name })));
+    if (all.length) {
+      const top = all.reduce((a, b) => (b.price > a.price ? b : a));
+      awards.push(["Biggest splurge", `${top.who}: $${top.price} on ${top.name}`]);
+      const cheap = all.reduce((a, b) => (b.price < a.price ? b : a));
+      awards.push(["Best bargain", `${cheap.who}: ${cheap.name} for $${cheap.price}`]);
+      const most = ps.reduce((a, b) => (b.items.length > a.items.length ? b : a));
+      awards.push(["Most loaded", `${most.name}: ${most.items.length} topping${most.items.length === 1 ? "" : "s"}`]);
+      const saver = ps.reduce((a, b) => (b.money > a.money ? b : a));
+      awards.push(["Penny pincher", `${saver.name}: $${saver.money} left`]);
+      const weird = ps.map((p) => ({ p, n: p.items.filter((x) => x.wild).length })).sort((a, b) => b.n - a.n)[0];
+      if (weird && weird.n) awards.push(["Chef's nightmare", `${weird.p.name}: ${weird.n} wildcard${weird.n === 1 ? "" : "s"}`]);
+    }
+    const cards = ps.map((p, i) => `
+      <article class="pizza-card">
+        <h2>${esc(p.name)}</h2>
+        <canvas id="pz-${i}" width="480" height="480" role="img" aria-label="${esc(p.name)}'s pizza"></canvas>
+        ${p.items.length ? `<ul>${p.items.map((it) => `<li><span>${it.emoji} ${esc(it.name)}</span><span class="num">$${it.price}</span></li>`).join("")}</ul>`
+          : `<p class="muted">Plain cheese. Bold strategy.</p>`}
+        <div class="totals"><span>Spent <span class="num">$${S.settings.budget - p.money}</span></span><span>Left <span class="num">$${p.money}</span></span></div>
+      </article>`).join("");
+    return `
+      <section class="intro">
+        <p class="label">Auction closed · ${S.log.length} of ${S.lots.length} lots called</p>
+        <h1>Pizzas out of the oven</h1>
+        <p>Vote on the best pizza. The penny pincher has to defend theirs.</p>
+      </section>
+      ${awards.length ? `<section class="awards">${awards.map(([t, d]) => `<div class="award"><span class="label">${t}</span><b>${esc(d)}</b></div>`).join("")}</section>` : ""}
+      <section class="pizzas">${cards}</section>
+      <div class="controls">
+        <button class="btn primary big" data-act="rematch">Rematch, same players</button>
+        <button class="btn ghost big" data-act="setup">Change setup</button>
+      </div>`;
+  }
+
+  // Seeded random so each pizza looks the same every time it is drawn.
+  function rng(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
+  function drawPizzas() {
+    S.players.forEach((p, i) => {
+      const c = document.getElementById("pz-" + i);
+      if (!c) return;
+      const g = c.getContext("2d"), W = c.width, R = W / 2;
+      const rand = rng(1000 + i * 7919 + p.items.length * 31);
+      g.clearRect(0, 0, W, W);
+      g.fillStyle = "#c98a45"; g.beginPath(); g.arc(R, R, R - 4, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#e0a65c"; g.beginPath(); g.arc(R, R, R - 14, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#c7361f"; g.beginPath(); g.arc(R, R, R - 34, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#f4d98a";
+      for (let k = 0; k < 26; k++) {
+        const a = rand() * Math.PI * 2, d = rand() * (R - 80);
+        g.beginPath(); g.arc(R + Math.cos(a) * d, R + Math.sin(a) * d, 28 + rand() * 30, 0, Math.PI * 2); g.fill();
+      }
+      const per = p.items.length > 6 ? 3 : p.items.length > 3 ? 4 : 6;
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.font = `${p.items.length > 6 ? 34 : 42}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+      p.items.forEach((it) => {
+        for (let k = 0; k < per; k++) {
+          const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * (R - 70);
+          g.save(); g.translate(R + Math.cos(a) * d, R + Math.sin(a) * d); g.rotate((rand() - 0.5) * 1.2);
+          g.fillText(it.emoji, 0, 0); g.restore();
+        }
+      });
+      g.strokeStyle = "rgba(90,40,10,.35)"; g.lineWidth = 3;
+      for (let k = 0; k < 4; k++) {
+        const a = (k * Math.PI) / 4;
+        g.beginPath(); g.moveTo(R - Math.cos(a) * (R - 16), R - Math.sin(a) * (R - 16)); g.lineTo(R + Math.cos(a) * (R - 16), R + Math.sin(a) * (R - 16)); g.stroke();
+      }
+    });
+  }
+
+  // ---------- events ----------
+  app.addEventListener("click", (e) => {
+    const t = e.target.closest("button");
+    if (!t || t.disabled) return;
+    if (t.dataset.bid !== undefined) return bid(+t.dataset.bid);
+    if (t.dataset.remove !== undefined) { S.names.splice(+t.dataset.remove, 1); return render(); }
+    switch (t.dataset.act) {
+      case "add": S.names.push("Player " + (S.names.length + 1)); render(); document.getElementById("pname-" + (S.names.length - 1))?.select(); break;
+      case "start": startGame(); break;
+      case "sell": sell(); break;
+      case "undo": undo(); break;
+      case "nosale": noSale(); break;
+      case "end": endEarly(); break;
+      case "rematch": rematch(); break;
+      case "setup": { const names = S.players.map((p) => p.name), st = S.settings; S = freshState(); S.names = names; S.settings = st; render(); break; }
+    }
+  });
+  app.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.dataset.name !== undefined) S.names[+t.dataset.name] = t.value;
+    if (t.dataset.set) {
+      const k = t.dataset.set;
+      S.settings[k] = t.type === "checkbox" ? t.checked : t.type === "number" ? t.value : +t.value;
+      if (k === "budget") { const b = app.querySelector(".intro b"); if (b) b.textContent = "$" + t.value; }
+    }
+  });
+  app.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && S.phase === "setup" && e.target.matches("input[data-name]")) startGame();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (S.phase !== "auction" || e.target.matches("input, select") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^[1-9]$/.test(e.key) && +e.key <= S.players.length) { e.preventDefault(); bid(+e.key - 1); }
+    else if (e.key === "Enter") { e.preventDefault(); sell(); }
+    else if (e.key === "z" || e.key === "Z") undo();
+    else if (e.key === "n" || e.key === "N") noSale();
+  });
+
+  // ---------- boot ----------
+  function start(data) {
+    S = data && data.S ? data.S : freshState();
+    if (S.showing) nextLot(); else render();
+    startTick();
+  }
+  window.claude?.hot?.snapshot?.(() => ({ S }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
