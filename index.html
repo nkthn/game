@@ -125,23 +125,32 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .stamp.nosale .inner { border-color: #8a7a5e; color: #8a7a5e; }
 @keyframes stamp { from { transform: rotate(-6deg) scale(1.8); opacity: 0; } to { transform: rotate(-6deg) scale(1); opacity: 1; } }
 
-.paddles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-.paddle {
-  border: 0; text-align: left; border-radius: 18px; padding: 14px; background: var(--felt-2);
-  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center;
-  box-shadow: inset 0 0 0 2px transparent; transition: background .15s, box-shadow .15s, transform .08s;
+.turn { background: var(--felt-2); border-radius: 22px; padding: 20px; display: grid; gap: 14px; }
+.turn.enter { animation: enter .3s ease; }
+@keyframes enter { from { opacity: .3; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.turn-head { display: flex; gap: 14px; align-items: center; }
+.turn-head .disc { flex: none; width: 56px; height: 56px; border-radius: 50%; background: var(--cheese); color: var(--ink); display: grid; place-items: center; font-family: var(--font-num); font-size: 1.4rem; }
+.turn-head .who { font-family: var(--font-display); font-size: clamp(1.8rem, 7vw, 2.6rem); line-height: 1; color: var(--cheese); overflow-wrap: anywhere; min-width: 0; }
+.raise {
+  border: 0; width: 100%; min-height: 120px; border-radius: 22px; background: var(--tomato); color: #fff;
+  font-family: var(--font-display); font-size: clamp(2rem, 9vw, 3.2rem); line-height: 1.05; padding: 18px;
+  box-shadow: 0 8px 0 var(--tomato-ink); transition: transform .06s, box-shadow .06s, background .15s;
 }
-.paddle .disc { grid-row: span 2; width: 48px; height: 48px; border-radius: 50%; background: var(--dough); color: var(--ink); display: grid; place-items: center; font-family: var(--font-num); font-size: 1.2rem; }
-.paddle .pname { font-weight: 700; font-size: 1.05rem; overflow-wrap: anywhere; min-width: 0; }
-.paddle .pmeta { font-size: .85rem; color: var(--dough-dim); }
-.paddle .act { grid-column: 1 / -1; margin-top: 8px; padding: 8px 12px; border-radius: 99px; text-align: center; font-weight: 700; background: var(--tomato); color: #fff; }
-.paddle:hover:not(:disabled) { background: var(--felt-3); }
-.paddle:active:not(:disabled) { transform: translateY(1px); }
-.paddle:disabled { cursor: default; }
-.paddle:disabled .act { background: transparent; color: var(--dough-dim); box-shadow: inset 0 0 0 2px var(--line); }
-.paddle.leading { box-shadow: inset 0 0 0 3px var(--cheese); }
-.paddle.leading .disc { background: var(--cheese); }
-.paddle.leading .act { color: var(--cheese); box-shadow: inset 0 0 0 2px var(--cheese); }
+.raise small { display: block; font-family: var(--font-body); font-weight: 700; font-size: 1rem; opacity: .85; margin-top: 6px; }
+.raise:hover { background: #ea4c35; }
+.raise:active { transform: translateY(6px); box-shadow: 0 2px 0 var(--tomato-ink); }
+.turn .pass { width: 100%; }
+.turn-clock { font-weight: 700; color: var(--cheese); min-height: 1.5em; text-align: center; }
+
+.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.seat { border-radius: 14px; padding: 10px 12px; background: var(--felt-2); display: grid; gap: 2px; box-shadow: inset 0 0 0 2px transparent; }
+.seat .sname { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
+.seat .smeta { font-size: .82rem; color: var(--dough-dim); }
+.seat .pill { justify-self: start; margin-top: 4px; padding: 1px 10px; border-radius: 99px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; box-shadow: inset 0 0 0 2px var(--line); color: var(--dough-dim); }
+.seat.now { box-shadow: inset 0 0 0 3px var(--dough); }
+.seat.now .pill { background: var(--dough); color: var(--ink); box-shadow: none; }
+.seat.leading .pill { background: var(--cheese); color: var(--ink); box-shadow: none; }
+.seat.out { opacity: .5; }
 
 .controls { display: flex; gap: 10px; flex-wrap: wrap; }
 .controls .grow { flex: 1 1 220px; }
@@ -166,9 +175,7 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
 @media (max-width: 560px) {
   .lot { grid-template-columns: auto 1fr; }
   .price { grid-column: 1 / -1; text-align: left; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-  .paddles { grid-template-columns: 1fr 1fr; }
-  .paddle { grid-template-columns: 1fr; padding: 12px; }
-  .paddle .disc { grid-row: auto; width: 38px; height: 38px; font-size: 1rem; }
+  .roster { grid-template-columns: 1fr 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -210,7 +217,8 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
       phase: "setup",
       names: ["Player 1", "Player 2", "Player 3", "Player 4"],
       settings: { budget: 30, lots: 15, cap: 0, timer: 0, wild: true, mystery: false },
-      players: [], lots: [], lotIndex: 0, bids: [], deadline: 0, log: [], showing: null, error: ""
+      players: [], lots: [], lotIndex: 0, bids: [], active: [], turn: 0, starter: 0, history: [],
+      deadline: 0, log: [], showing: null, error: ""
     };
   }
 
@@ -227,14 +235,33 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
   const leader = () => (S.bids.length ? S.bids[S.bids.length - 1] : -1);
   const lot = () => S.lots[S.lotIndex];
   const capped = (p) => S.settings.cap > 0 && p.items.length >= S.settings.cap;
-  function bidState(i) {
-    const p = S.players[i];
-    if (i === leader()) return { ok: false, why: "High bidder" };
-    if (capped(p)) return { ok: false, why: "Pizza full" };
-    if (p.money < price() + 1) return { ok: false, why: p.money === 0 ? "Out of money" : "Can't afford" };
-    return { ok: true, why: "Bid $" + (price() + 1) };
-  }
+  const canRaise = (i) => !capped(S.players[i]) && S.players[i].money >= price() + 1;
   const anyoneCanOpen = () => S.players.some((p) => !capped(p) && p.money >= 1);
+
+  // Move the turn to the next player still in the lot. Players who can't cover
+  // the next raise drop out automatically. When nobody is left to challenge the
+  // high bidder, the lot sells; when nobody bid at all, it goes unsold.
+  function nextTurn(from) {
+    const n = S.players.length;
+    for (let guard = 0; guard < n * 2 + 2; guard++) {
+      const lead = leader();
+      const contenders = S.players.map((_, i) => i).filter((i) => S.active[i] && i !== lead);
+      if (!contenders.length) return S.bids.length ? sell() : noSale();
+      let i = from;
+      do { i = (i + 1) % n; } while (!(S.active[i] && i !== lead));
+      if (!canRaise(i)) { S.active[i] = false; from = i; continue; }
+      S.turn = i;
+      S.deadline = S.settings.timer ? Date.now() + S.settings.timer * 1000 : 0;
+      return render(true);
+    }
+  }
+
+  function beginLot() {
+    const n = S.players.length;
+    S.bids = []; S.history = []; S.showing = null; S.deadline = 0;
+    S.active = S.players.map((p) => !capped(p) && p.money >= 1);
+    nextTurn((S.starter - 1 + n) % n);
+  }
 
   // ---------- actions ----------
   function startGame() {
@@ -248,22 +275,32 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
     S.players = names.map((name) => ({ name, money: st.budget, items: [] }));
     const pool = shuffle(TOPPINGS.concat(st.wild ? WILDCARDS : []));
     S.lots = pool.slice(0, st.lots);
-    S.lotIndex = 0; S.bids = []; S.log = []; S.deadline = 0; S.showing = null;
+    S.lotIndex = 0; S.log = []; S.starter = 0;
     S.phase = "auction";
-    render();
+    beginLot();
   }
 
-  function bid(i) {
-    if (S.phase !== "auction" || S.showing || !bidState(i).ok) return;
-    S.bids.push(i);
-    if (S.settings.timer) S.deadline = Date.now() + S.settings.timer * 1000;
-    render(true);
+  const snap = () => S.history.push({ bids: S.bids.slice(), active: S.active.slice(), turn: S.turn });
+
+  function raise() {
+    if (S.phase !== "auction" || S.showing || !canRaise(S.turn)) return;
+    snap();
+    S.bids.push(S.turn);
+    nextTurn(S.turn);
+  }
+
+  function pass() {
+    if (S.phase !== "auction" || S.showing) return;
+    snap();
+    S.active[S.turn] = false;
+    nextTurn(S.turn);
   }
 
   function undo() {
-    if (S.showing || !S.bids.length) return;
-    S.bids.pop();
-    S.deadline = S.bids.length && S.settings.timer ? Date.now() + S.settings.timer * 1000 : 0;
+    if (S.showing || !S.history.length) return;
+    const h = S.history.pop();
+    S.bids = h.bids; S.active = h.active; S.turn = h.turn;
+    S.deadline = S.settings.timer ? Date.now() + S.settings.timer * 1000 : 0;
     render();
   }
 
@@ -293,8 +330,9 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
     pauseTimer = null;
     S.showing = null; S.bids = []; S.deadline = 0;
     S.lotIndex++;
-    if (S.lotIndex >= S.lots.length || !anyoneCanOpen()) S.phase = "end";
-    render();
+    S.starter = (S.starter + 1) % S.players.length;   // a different player opens each lot
+    if (S.lotIndex >= S.lots.length || !anyoneCanOpen()) { S.phase = "end"; return render(); }
+    beginLot();
   }
 
   function endEarly() {
@@ -313,19 +351,15 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
 
   // ---------- timer ----------
   function timerText() {
-    if (!S.settings.timer) return S.bids.length ? "Call it with Sold when the bidding stops." : "";
-    if (!S.bids.length) return "Clock starts on the first bid.";
-    const left = Math.max(0, S.deadline - Date.now()) / 1000;
-    const t = S.settings.timer;
-    if (left > (2 * t) / 3) return Math.ceil(left) + "s on the clock";
-    if (left > t / 3) return "Going once… " + Math.ceil(left) + "s";
-    return "Going twice… " + Math.ceil(left) + "s";
+    if (!S.settings.timer || !S.deadline) return "";
+    const left = Math.ceil(Math.max(0, S.deadline - Date.now()) / 1000);
+    return left <= 3 ? "Hurry! Auto-pass in " + left + "s" : left + "s to decide";
   }
   function startTick() {
     if (tick) return;
     tick = setInterval(() => {
       if (S.phase !== "auction" || S.showing || !S.deadline) return;
-      if (Date.now() >= S.deadline) { sell(); return; }
+      if (Date.now() >= S.deadline) { pass(); return; }
       const el = document.getElementById("timer");
       if (el) el.textContent = timerText();
     }, 150);
@@ -350,7 +384,7 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
       <section class="intro">
         <p class="label">Pass-and-play · 2 to 8 players</p>
         <h1>Pizza Topping Auction</h1>
-        <p>Everyone starts with <b>$${esc(st.budget)}</b>. Toppings come up one at a time in random order. Tap your paddle to raise the price by $1. The highest bidder wins the topping and pays for it. When the lots run out, compare pizzas.</p>
+        <p>Everyone starts with <b>$${esc(st.budget)}</b>. Toppings come up one at a time in random order. Players take turns: on your turn, raise the price by $1 or pass. Once you pass, you're out for that topping. When everyone else has passed, the high bidder wins the topping and pays for it. When the lots run out, compare pizzas.</p>
       </section>
       <section class="panel">
         <h2>Bidders</h2>
@@ -368,9 +402,9 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
             <select id="s-cap" data-set="cap">
               ${[0, 3, 4, 5, 6, 8].map((v) => `<option value="${v}" ${+st.cap === v ? "selected" : ""}>${v ? v : "No limit"}</option>`).join("")}
             </select></label>
-          <label class="field"><span class="label">Auto-sell clock</span>
+          <label class="field"><span class="label">Turn clock</span>
             <select id="s-timer" data-set="timer">
-              ${[0, 5, 8, 10, 15].map((v) => `<option value="${v}" ${+st.timer === v ? "selected" : ""}>${v ? v + " seconds after last bid" : "Off: tap Sold yourself"}</option>`).join("")}
+              ${[0, 5, 8, 10, 15].map((v) => `<option value="${v}" ${+st.timer === v ? "selected" : ""}>${v ? v + " seconds, then auto-pass" : "Off: take your time"}</option>`).join("")}
             </select></label>
         </div>
         <div class="settings">
@@ -398,17 +432,35 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
       stamp = `<div class="stamp nosale"><div class="inner"><b>No sale</b><span>Nobody wanted it</span></div></div>`;
     }
 
-    const paddles = S.players.map((p, i) => {
-      const b = bidState(i);
-      const key = i < 9 ? `<kbd>${i + 1}</kbd>` : "";
+    const stillIn = S.active.filter(Boolean).length;
+    const roster = S.players.map((p, i) => {
+      const now = !S.showing && i === S.turn;
+      const status = i === lead ? "Leading" : now ? "Deciding" : S.active[i] ? "In" : "Passed";
+      const cls = i === lead ? "leading" : now ? "now" : S.active[i] ? "" : "out";
       return `
-        <button class="paddle ${i === lead ? "leading" : ""}" data-bid="${i}" ${b.ok && !S.showing ? "" : "disabled"} aria-label="${esc(p.name)}: ${esc(b.why)}">
-          <span class="disc">${i + 1}</span>
-          <span class="pname">${esc(p.name)}</span>
-          <span class="pmeta"><span class="num">$${p.money}</span> left · ${p.items.length} topping${p.items.length === 1 ? "" : "s"}${S.settings.cap ? "/" + S.settings.cap : ""}</span>
-          <span class="act">${esc(b.why)}</span>
-        </button>`;
+        <div class="seat ${cls}">
+          <span class="sname">${esc(p.name)}</span>
+          <span class="smeta"><span class="num">$${p.money}</span> · ${p.items.length} topping${p.items.length === 1 ? "" : "s"}${S.settings.cap ? "/" + S.settings.cap : ""}</span>
+          <span class="pill">${status}</span>
+        </div>`;
     }).join("");
+
+    const me = S.players[S.turn];
+    const next = price() + 1;
+    const turnPanel = S.showing ? "" : `
+      <section class="turn ${flash ? "enter" : ""}" aria-live="polite">
+        <div class="turn-head">
+          <span class="disc" aria-hidden="true">${S.turn + 1}</span>
+          <div style="min-width:0">
+            <div class="label">Your turn</div>
+            <div class="who">${esc(me.name)}</div>
+            <div class="muted"><span class="num">$${me.money}</span> to spend · ${me.items.length} topping${me.items.length === 1 ? "" : "s"} so far</div>
+          </div>
+        </div>
+        <button class="raise" data-act="raise">Raise to $${next}<small>${lead >= 0 ? "Outbid " + esc(S.players[lead].name) : "Open the bidding"}</small></button>
+        <button class="btn ghost big pass" data-act="pass">${lead >= 0 ? "Pass, drop out of this lot" : "Pass"}</button>
+        <div class="turn-clock" id="timer">${esc(timerText())}</div>
+      </section>`;
 
     const log = S.log.slice(0, 6).map((l) => `
       <li><span class="num muted">${pad2(l.lot)}</span><span class="grow">${l.emoji} ${esc(l.item)}</span>
@@ -434,22 +486,23 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
           <div class="amt num" style="font-family:var(--font-display)">$${price()}</div>
           <div>
             <div class="who">${lead >= 0 ? esc(S.players[lead].name) + " leads" : "No bids yet"}</div>
-            <div class="timer" id="timer">${lead >= 0 ? esc(timerText()) : "Opening bid is $1"}</div>
+            <div class="timer">${lead >= 0 ? stillIn - 1 + " still challenging" : "Opening bid is $1"}</div>
           </div>
         </div>
         ${stamp}
       </section>
 
-      <section class="paddles" aria-label="Bidders">${paddles}</section>
+      ${turnPanel}
+
+      <section style="display:grid;gap:10px" aria-label="Players">
+        <div class="label">Table</div>
+        <div class="roster">${roster}</div>
+      </section>
 
       <div class="controls">
-        <button class="btn primary big grow" data-act="sell" ${S.bids.length && !S.showing ? "" : "disabled"}>
-          ${lead >= 0 ? "Sold to " + esc(S.players[lead].name) + " for $" + price() : "Sold"}
-        </button>
-        <button class="btn big" data-act="undo" ${S.bids.length && !S.showing ? "" : "disabled"}>Undo bid</button>
-        <button class="btn ghost big" data-act="nosale" ${!S.bids.length && !S.showing ? "" : "disabled"}>No sale</button>
+        <button class="btn" data-act="undo" ${S.history.length && !S.showing ? "" : "disabled"}>Undo last move</button>
       </div>
-      <p class="hint">Keyboard: <kbd>1</kbd>–<kbd>${Math.min(9, S.players.length)}</kbd> bid · <kbd>Enter</kbd> sold · <kbd>Z</kbd> undo · <kbd>N</kbd> no sale</p>
+      <p class="hint">Keyboard: <kbd>Space</kbd> raise · <kbd>P</kbd> pass · <kbd>Z</kbd> undo</p>
 
       ${log ? `<section style="display:grid;gap:10px"><div class="label">Recent sales</div><ul class="log">${log}</ul></section>` : ""}`;
   }
@@ -531,14 +584,13 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
   app.addEventListener("click", (e) => {
     const t = e.target.closest("button");
     if (!t || t.disabled) return;
-    if (t.dataset.bid !== undefined) return bid(+t.dataset.bid);
     if (t.dataset.remove !== undefined) { S.names.splice(+t.dataset.remove, 1); return render(); }
     switch (t.dataset.act) {
       case "add": S.names.push("Player " + (S.names.length + 1)); render(); document.getElementById("pname-" + (S.names.length - 1))?.select(); break;
       case "start": startGame(); break;
-      case "sell": sell(); break;
+      case "raise": raise(); break;
+      case "pass": pass(); break;
       case "undo": undo(); break;
-      case "nosale": noSale(); break;
       case "end": endEarly(); break;
       case "rematch": rematch(); break;
       case "setup": { const names = S.players.map((p) => p.name), st = S.settings; S = freshState(); S.names = names; S.settings = st; render(); break; }
@@ -558,10 +610,10 @@ kbd { font-family: var(--font-num); font-size: .8rem; padding: 1px 6px; border-r
   });
   document.addEventListener("keydown", (e) => {
     if (S.phase !== "auction" || e.target.matches("input, select") || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (/^[1-9]$/.test(e.key) && +e.key <= S.players.length) { e.preventDefault(); bid(+e.key - 1); }
-    else if (e.key === "Enter") { e.preventDefault(); sell(); }
+    if (e.repeat) return;
+    if (e.key === " ") { e.preventDefault(); raise(); }
+    else if (e.key === "p" || e.key === "P") pass();
     else if (e.key === "z" || e.key === "Z") undo();
-    else if (e.key === "n" || e.key === "N") noSale();
   });
 
   // ---------- boot ----------
